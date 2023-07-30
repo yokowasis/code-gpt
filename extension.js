@@ -98,8 +98,40 @@ function activate(context) {
     }
   );
 
+  let askCode = vscode.commands.registerCommand(
+    "code-gpt.askCode",
+    async function () {
+      const loadingTitle = "Loading...";
+      let sentence = await vscode.window.showInputBox({
+        prompt: "Generate Code in Programming Language ...",
+        placeHolder: "e.g. Python to create a Line Chart",
+      });
+
+      return vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification, // Show the progress in the notification area
+          title: loadingTitle,
+        },
+        async (progress) => {
+          // Start the long-running task
+          sentence = `Generate Code in Programming Language ${sentence}. Only Output the code as plain text. Nothing else.`;
+          await doAskGPT(sentence);
+
+          // Close the progress indicator
+          progress.report({ increment: 100 });
+          return new Promise((resolve) => {
+            setTimeout(() => {
+              resolve();
+            }, 1000); // Wait 1 second to let the user see the completion of the progress bar
+          });
+        }
+      );
+    }
+  );
+
   context.subscriptions.push(disposable);
   context.subscriptions.push(askGpt);
+  context.subscriptions.push(askCode);
 }
 
 // This method is called when your extension is deactivated
