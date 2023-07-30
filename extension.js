@@ -15,7 +15,7 @@ const openai = new OpenAIApi(configuration);
  * @param {string} sentence
  * @returns
  */
-const doAskGPT = async (sentence) => {
+const doAskGPT = async (sentence, code = false) => {
   if (sentence === undefined) {
     // User canceled the input
     vscode.window.showInformationMessage("You canceled the input.");
@@ -27,6 +27,13 @@ const doAskGPT = async (sentence) => {
     messages: [{ role: "user", content: sentence }],
   });
   const aimsg = chatCompletion.data.choices[0].message;
+  let content = "";
+
+  if (code) {
+    content = extractCode(aimsg.content);
+  } else {
+    content = aimsg.content;
+  }
 
   const activeTextEditor = vscode.window.activeTextEditor;
   if (!activeTextEditor) {
@@ -36,7 +43,7 @@ const doAskGPT = async (sentence) => {
   const cursorPosition = activeTextEditor.selection.active;
   const edit = new vscode.TextEdit(
     new vscode.Range(cursorPosition, cursorPosition),
-    aimsg.content
+    content
   );
 
   const workspaceEdit = new vscode.WorkspaceEdit();
@@ -56,6 +63,27 @@ function getCurrentLanguageId() {
   }
 
   return undefined;
+}
+
+/**
+ *
+ * @param {string} text
+ * @returns
+ */
+function extractCode(text) {
+  const arrText = text.split("```");
+  if (arrText.length !== 3) {
+    return text;
+  } else {
+    // Use regular expression to extract the code portion
+    const codeRegex = /(\`\`\`.*\n)([\s\S]*)(\`\`\`)/;
+    const match = text.match(codeRegex);
+
+    // Extract the matched code block
+    const code = match ? match[2].trim() : "";
+
+    return code;
+  }
 }
 
 // This method is called when your extension is activated
@@ -128,9 +156,9 @@ function activate(context) {
         },
         async (progress) => {
           // Start the long-running task
-          sentence = `Generate Code in ${getCurrentLanguageId()} for ${sentence}. Only Output the code as plain text. Nothing else.`;
+          sentence = `Generate Code for ${sentence} in ${getCurrentLanguageId()}. No explanation needed`;
           console.log(sentence);
-          await doAskGPT(sentence);
+          await doAskGPT(sentence, true);
 
           // Close the progress indicator
           progress.report({ increment: 100 });
