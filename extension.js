@@ -44,6 +44,20 @@ const doAskGPT = async (sentence) => {
   vscode.workspace.applyEdit(workspaceEdit);
 };
 
+/**
+ *
+ * @returns {string | undefined}
+ */
+function getCurrentLanguageId() {
+  const activeTextEditor = vscode.window.activeTextEditor;
+
+  if (activeTextEditor) {
+    return activeTextEditor.document.languageId;
+  }
+
+  return undefined;
+}
+
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 
@@ -103,8 +117,8 @@ function activate(context) {
     async function () {
       const loadingTitle = "Loading...";
       let sentence = await vscode.window.showInputBox({
-        prompt: "Generate Code in Programming Language ...",
-        placeHolder: "e.g. Python to create a Line Chart",
+        prompt: "Generate Code for ...",
+        placeHolder: "bubble sort",
       });
 
       return vscode.window.withProgress(
@@ -114,7 +128,8 @@ function activate(context) {
         },
         async (progress) => {
           // Start the long-running task
-          sentence = `Generate Code in Programming Language ${sentence}. Only Output the code as plain text. Nothing else.`;
+          sentence = `Generate Code in ${getCurrentLanguageId()} for ${sentence}. Only Output the code as plain text. Nothing else.`;
+          console.log(sentence);
           await doAskGPT(sentence);
 
           // Close the progress indicator
