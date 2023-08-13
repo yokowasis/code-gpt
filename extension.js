@@ -12,6 +12,19 @@ const openai = new OpenAIApi(configuration);
 
 /**
  *
+ * @param {string} prompt
+ */
+const promptAI = async (prompt) => {
+  const chatCompletion = await openai.createChatCompletion({
+    model: "gpt-3.5-turbo",
+    messages: [{ role: "user", content: prompt }],
+  });
+  const aimsg = chatCompletion.data.choices[0].message;
+  return aimsg.content;
+};
+
+/**
+ *
  * @param {string} sentence
  * @returns
  */
@@ -22,17 +35,12 @@ const doAskGPT = async (sentence, code = false) => {
     return;
   }
 
-  const chatCompletion = await openai.createChatCompletion({
-    model: "gpt-3.5-turbo",
-    messages: [{ role: "user", content: sentence }],
-  });
-  const aimsg = chatCompletion.data.choices[0].message;
-  let content = "";
+  let content = await promptAI(sentence);
 
   if (code) {
-    content = extractCode(aimsg.content);
+    content = extractCode(content);
   } else {
-    content = aimsg.content;
+    content = content;
   }
 
   const activeTextEditor = vscode.window.activeTextEditor;
@@ -63,6 +71,34 @@ function getCurrentLanguageId() {
   }
 
   return undefined;
+}
+
+/**
+ *
+ * @param {string} data
+ */
+async function showOutputInNewTab(data) {
+  try {
+    // Create a new untitled text document with the provided content
+    const doc = await vscode.workspace.openTextDocument({ content: data });
+
+    // Show the text document in a new tab and focus on it
+    const editor = await vscode.window.showTextDocument(doc, {
+      preview: false,
+      viewColumn: vscode.ViewColumn.Active,
+    });
+
+    // Optionally, you can focus the editor and move the cursor
+    editor.selection = new vscode.Selection(
+      new vscode.Position(0, 0),
+      new vscode.Position(0, 0)
+    );
+    editor.revealRange(new vscode.Range(0, 0, 0, 0));
+  } catch (error) {
+    vscode.window.showErrorMessage(
+      `Error showing output in new tab: ${error.message}`
+    );
+  }
 }
 
 /**
@@ -126,7 +162,9 @@ function activate(context) {
         },
         async (progress) => {
           // Start the long-running task
-          await doAskGPT(sentence);
+          const res = await promptAI(sentence);
+
+          showOutputInNewTab(res);
 
           // Close the progress indicator
           progress.report({ increment: 100 });
