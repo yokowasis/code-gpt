@@ -28,7 +28,7 @@ const promptAI = async (prompt) => {
  * @param {string} sentence
  * @returns
  */
-const doAskGPT = async (sentence, code = false) => {
+const doAskGPT = async (sentence, code = false, splitter = "```") => {
   if (sentence === undefined) {
     // User canceled the input
     vscode.window.showInformationMessage("You canceled the input.");
@@ -38,7 +38,7 @@ const doAskGPT = async (sentence, code = false) => {
   let content = await promptAI(sentence);
 
   if (code) {
-    content = extractCode(content);
+    content = extractCode(content, splitter);
   } else {
     content = content;
   }
@@ -77,10 +77,13 @@ function getCurrentLanguageId() {
  *
  * @param {string} data
  */
-async function showOutputInNewTab(data) {
+async function showOutputInNewTab(data, languageId = "markdown") {
   try {
     // Create a new untitled text document with the provided content
-    const doc = await vscode.workspace.openTextDocument({ content: data });
+    const doc = await vscode.workspace.openTextDocument({
+      content: data,
+      language: languageId,
+    });
 
     // Show the text document in a new tab and focus on it
     const editor = await vscode.window.showTextDocument(doc, {
@@ -101,13 +104,55 @@ async function showOutputInNewTab(data) {
   }
 }
 
+function getSurroundingLines() {
+  const activeTextEditor = vscode.window.activeTextEditor;
+
+  if (activeTextEditor) {
+    const cursorPosition = activeTextEditor.selection.active;
+    const document = activeTextEditor.document;
+
+    const lineBeforeCursor = Math.max(cursorPosition.line - 3, 0);
+    const lineAfterCursor = Math.min(
+      cursorPosition.line + 3,
+      document.lineCount - 1
+    );
+
+    let surroundingText = [];
+    for (let line = lineBeforeCursor; line <= lineAfterCursor; line++) {
+      const lineText = document.lineAt(line).text;
+      surroundingText.push(lineText);
+    }
+
+    // Add the text to insert to the middle of the array
+    const insertAtIndex = Math.floor(surroundingText.length / 2);
+    surroundingText.splice(
+      insertAtIndex,
+      0,
+      "//-------generatedgptcode-------"
+    );
+    surroundingText.splice(
+      insertAtIndex,
+      0,
+      "//-------generatedgptcode-------"
+    );
+
+    // Join the array into a single string
+    const surroundingTextStr = surroundingText.join("\n");
+
+    return surroundingTextStr;
+  }
+
+  return undefined;
+}
+
 /**
  *
  * @param {string} text
+ * @param {string} splitter
  * @returns
  */
-function extractCode(text) {
-  const arrText = text.split("```");
+function extractCode(text, splitter) {
+  const arrText = text.split(splitter);
   if (arrText.length !== 3) {
     return text;
   } else {
@@ -178,6 +223,51 @@ function activate(context) {
     }
   );
 
+  let testCode = vscode.commands.registerCommand(
+    "code-gpt.testCode",
+    async function () {
+      const loadingTitle = "Loading...";
+
+      let sentence = await vscode.window.showInputBox({
+        prompt: "Generate Code for ...",
+        placeHolder: "bubble sort",
+      });
+
+      return vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification, // Show the progress in the notification area
+          title: loadingTitle,
+        },
+        async (progress) => {
+          // Start the long-running task
+          const lines = getSurroundingLines();
+          if (lines === undefined) {
+            return;
+          }
+
+          sentence = `create a snippet in ${getCurrentLanguageId()} to ${sentence}. Write the code inside //-------generatedgptcode-------.
+          
+          \`\`\`
+          ${lines}
+          \`\`\`
+          `;
+
+          console.log(sentence);
+
+          await doAskGPT(sentence, true, "//-------generatedgptcode-------");
+
+          // Close the progress indicator
+          progress.report({ increment: 100 });
+          return new Promise((resolve) => {
+            setTimeout(() => {
+              resolve();
+            }, 1000); // Wait 1 second to let the user see the completion of the progress bar
+          });
+        }
+      );
+    }
+  );
+
   let askCode = vscode.commands.registerCommand(
     "code-gpt.askCode",
     async function () {
@@ -195,8 +285,11 @@ function activate(context) {
         async (progress) => {
           // Start the long-running task
           sentence = `Generate Code for ${sentence} in ${getCurrentLanguageId()}. No explanation needed`;
-          console.log(sentence);
-          await doAskGPT(sentence, true);
+          // console.log(sentence);
+
+          const res = await promptAI(sentence);
+
+          showOutputInNewTab(extractCode(res, "```"), getCurrentLanguageId());
 
           // Close the progress indicator
           progress.report({ increment: 100 });
@@ -213,6 +306,7 @@ function activate(context) {
   context.subscriptions.push(disposable);
   context.subscriptions.push(askGpt);
   context.subscriptions.push(askCode);
+  context.subscriptions.push(testCode);
 }
 
 // This method is called when your extension is deactivated
