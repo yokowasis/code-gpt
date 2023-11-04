@@ -233,6 +233,8 @@ function activate(context) {
         placeHolder: "bubble sort",
       });
 
+      if (!sentence) return;
+
       return vscode.window.withProgress(
         {
           location: vscode.ProgressLocation.Notification, // Show the progress in the notification area
@@ -276,6 +278,7 @@ function activate(context) {
         prompt: "Generate Code for ...",
         placeHolder: "bubble sort",
       });
+      if (!sentence) return;
 
       return vscode.window.withProgress(
         {
@@ -287,9 +290,7 @@ function activate(context) {
           sentence = `Generate Code for ${sentence} in ${getCurrentLanguageId()}. No explanation needed`;
           // console.log(sentence);
 
-          const res = await promptAI(sentence);
-
-          showOutputInNewTab(extractCode(res, "```"), getCurrentLanguageId());
+          await doAskGPT(sentence, true);
 
           // Close the progress indicator
           progress.report({ increment: 100 });
