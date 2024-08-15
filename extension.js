@@ -1,26 +1,25 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 const vscode = require("vscode");
-const { Configuration, OpenAIApi } = require("openai");
+const { OpenAI } = require("openai");
 const config = vscode.workspace.getConfiguration("codegpt");
 const apiKey = config.get("openAIKey");
 
-const configuration = new Configuration({
+const openai = new OpenAI({
   apiKey: apiKey,
 });
-const openai = new OpenAIApi(configuration);
 
 /**
  *
  * @param {string} prompt
  */
 const promptAI = async (prompt) => {
-  const chatCompletion = await openai.createChatCompletion({
+  const chatCompletion = await openai.chat.completions.create({
     model: "gpt-3.5-turbo",
     messages: [{ role: "user", content: prompt }],
   });
-  const aimsg = chatCompletion.data.choices[0].message;
-  return aimsg.content;
+  const aimsg = chatCompletion.choices[0].message.content;
+  return aimsg;
 };
 
 /**
